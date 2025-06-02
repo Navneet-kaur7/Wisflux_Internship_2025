@@ -1,0 +1,22 @@
+Http Request:curl -v https://developer.mozilla.org/
+
+> GET / HTTP/1.1
+> Host: developer.mozilla.org
+> User-Agent: curl/8.9.1
+> Accept: */*
+
+
+Response:
+
+< HTTP/1.1 302 Found
+< cache-control: no-store
+< location: /en-US/
+< vary: Accept
+< content-type: text/plain; charset=utf-8
+< x-cloud-trace-context: 623074820421bd8c45f7b63751fa8040
+< date: Mon, 02 Jun 2025 11:44:08 GMT
+< server: Google Frontend
+< Content-Length: 29
+< Via: 1.1 google
+< X-cache: miss
+< Alt-Svc: clear
