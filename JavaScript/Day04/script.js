@@ -21,18 +21,37 @@ console.log(div.innerHTML)
 //div.innerHTML = "<i>Welcome to JavaScript</i>";
 
 
-let att= document.getAttribute("h2");
-console.log(att);
+// let att= document.getAttribute("h2");
+// console.log(att);
 
 
-let newBtn=document.createElement("button");
-newBtn.innerHTML = "Click";
-newBtn.style.backgroundColor = "blue";
-newBtn.style.color = "white";
-newBtn.onclick = function() {
-    alert("Button clicked!");
-};      
+// let newBtn=document.createElement("button");
+// newBtn.innerHTML = "Click";
+// newBtn.style.backgroundColor = "blue";
+// newBtn.style.color = "white";
+// newBtn.onclick = function() {
+//     alert("Button clicked!");
+// };      
 
 
+// let body = document.querySelector("body");
+// body.appendChild(newBtn);
+
+
+//Event handling
+//Toggling -dark mode to light mode or vice versa   
+let modeBtn= document.querySelector("#btn");
 let body = document.querySelector("body");
-body.appendChild(newBtn);
+let currentMode = "light";
+modeBtn.addEventListener("click", () => {
+    if (currentMode === "light") {
+        document.querySelector("body").classList.add("dark");
+        document.querySelector("body").classList.remove("light");
+        currentMode = "dark";
+    } else {
+        document.querySelector("body").classList.add("light");
+        document.querySelector("body").classList.remove("dark");
+        
+        currentMode = "light";
+    }
+});
