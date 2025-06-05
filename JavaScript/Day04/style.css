@@ -1,0 +1,59 @@
+
+        table,tr,th,td{
+            border: 2px solid red;
+           border-collapse: collapse;
+           padding: 20px;
+           border-spacing: 10px;;
+        }
+       
+        th{
+            color: aliceblue;
+            background-color: rgb(198, 88, 88);
+        }
+        td{
+            background-color: beige;
+        }
+        
+        body{
+            background-color: rgb(255, 255, 255);
+            color: black;
+            font-family: Arial, sans-serif;
+        }
+        h1{
+            text-align: center;
+            color: rgb(198, 88, 88);
+        }
+
+        h2{
+           
+            color: rgb(198, 88, 88);
+        }
+  button{
+            background-color: rgb(88, 150, 198);
+            color: rgb(197, 38, 56);
+            padding: 10px;
+            border-radius: 5px;
+            border: none;
+            cursor: pointer;
+        }
+        
+        button:hover{
+            background-color: rgb(255, 0, 0);
+        }
+        
+        .container{
+            width: 80%;
+            margin: auto;
+        }
+        
+        .form-group{
+            margin-bottom: 15px;
+        }
+        
+        input[type="text"]{
+            width: 100%;
+            padding: 10px;
+            border-radius: 5px;
+            border: 1px solid #ccc;
+        }
+        
