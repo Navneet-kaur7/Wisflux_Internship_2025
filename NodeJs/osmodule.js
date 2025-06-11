@@ -1,0 +1,10 @@
+const os = require('os');
+console.log('OS Architecture:', os.arch());
+console.log('OS Platform:', os.platform());
+console.log('OS Type:', os.type());
+console.log('free memory:', os.freemem());
+console.log('total memory:', os.totalmem());
+console.log('home directory:', os.homedir());
+console.log('release:', os.release());
+console.log('hostname:', os.hostname());
+console.log('uptime:', os.uptime());    
