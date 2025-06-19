@@ -41,102 +41,133 @@ export default function TodoApp() {
   const activeCount = tasks.length - completedCount;
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 py-8 px-4">
-      <div className="max-w-md mx-auto">
-        <div className="bg-white rounded-2xl shadow-xl p-6">
-          <h1 className="text-3xl font-bold text-gray-800 text-center mb-8">
-            To-Do App
-          </h1>
-          
-          {/* Add Task Input */}
-          <div className="flex gap-2 mb-6">
-            <input
-              type="text"
-              value={newTask}
-              onChange={(e) => setNewTask(e.target.value)}
-              onKeyPress={(e) => e.key === 'Enter' && addTask()}
-              placeholder="Add a new task..."
-              className="flex-1 px-4 py-3 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-            />
-            <button
-              onClick={addTask}
-              className="bg-blue-500 hover:bg-blue-600 text-white px-4 py-3 rounded-lg transition-colors duration-200 flex items-center justify-center"
-            >
-              <Plus size={20} />
-            </button>
-          </div>
-
-          {/* Filter Buttons */}
-          <div className="flex gap-1 mb-6 bg-gray-100 rounded-lg p-1">
-            {['all', 'active', 'completed'].map((filterType) => (
+    <div className="min-vh-100 py-4 px-3" style={{ background: 'linear-gradient(135deg, #f8f9fa 0%, #e3f2fd 100%)' }}>
+      <div className="container" style={{ maxWidth: '500px' }}>
+        <div className="card shadow-lg border-0" style={{ borderRadius: '20px' }}>
+          <div className="card-body p-4">
+            <h1 className="text-center fw-bold text-dark mb-4">
+              To-Do App
+            </h1>
+            
+            {/* Add Task Input */}
+            <div className="d-flex gap-2 mb-4">
+              <input
+                type="text"
+                value={newTask}
+                onChange={(e) => setNewTask(e.target.value)}
+                onKeyPress={(e) => e.key === 'Enter' && addTask()}
+                placeholder="Add a new task..."
+                className="form-control form-control-lg border-1"
+                style={{ borderRadius: '10px' }}
+              />
               <button
-                key={filterType}
-                onClick={() => setFilter(filterType)}
-                className={`flex-1 py-2 px-3 rounded-md text-sm font-medium transition-colors duration-200 capitalize ${
-                  filter === filterType
-                    ? 'bg-white text-blue-600 shadow-sm'
-                    : 'text-gray-600 hover:text-gray-800'
-                }`}
+                onClick={addTask}
+                className="btn btn-primary btn-lg px-3"
+                style={{ borderRadius: '10px' }}
               >
-                {filterType}
+                <Plus size={20} />
               </button>
-            ))}
-          </div>
+            </div>
 
-          {/* Task List */}
-          <div className="space-y-2 mb-6">
-            {filteredTasks.length === 0 ? (
-              <div className="text-center py-8 text-gray-500">
-                {filter === 'all' ? 'No tasks yet!' : `No ${filter} tasks`}
-              </div>
-            ) : (
-              filteredTasks.map((task) => (
-                <div
-                  key={task.id}
-                  className={`flex items-center gap-3 p-3 rounded-lg border transition-all duration-200 ${
-                    task.completed
-                      ? 'bg-gray-50 border-gray-200'
-                      : 'bg-white border-gray-200 hover:border-blue-300'
-                  }`}
+            {/* Filter Buttons */}
+            <div className="btn-group w-100 mb-4" role="group">
+              {['all', 'active', 'completed'].map((filterType) => (
+                <button
+                  key={filterType}
+                  type="button"
+                  onClick={() => setFilter(filterType)}
+                  className={`btn ${
+                    filter === filterType
+                      ? 'btn-primary'
+                      : 'btn-outline-secondary'
+                  } text-capitalize`}
                 >
-                  <button
-                    onClick={() => toggleTask(task.id)}
-                    className={`flex-shrink-0 w-6 h-6 rounded-full border-2 flex items-center justify-center transition-colors duration-200 ${
-                      task.completed
-                        ? 'bg-green-500 border-green-500 text-white'
-                        : 'border-gray-300 hover:border-green-400'
-                    }`}
-                  >
-                    {task.completed && <Check size={14} />}
-                  </button>
-                  
-                  <span
-                    className={`flex-1 transition-all duration-200 ${
-                      task.completed
-                        ? 'text-gray-500 line-through'
-                        : 'text-gray-800'
-                    }`}
-                  >
-                    {task.text}
-                  </span>
-                  
-                  <button
-                    onClick={() => deleteTask(task.id)}
-                    className="flex-shrink-0 text-gray-400 hover:text-red-500 transition-colors duration-200 p-1"
-                  >
-                    <X size={16} />
-                  </button>
+                  {filterType}
+                </button>
+              ))}
+            </div>
+
+            {/* Task List */}
+            <div className="mb-4">
+              {filteredTasks.length === 0 ? (
+                <div className="text-center py-5 text-muted">
+                  <em>{filter === 'all' ? 'No tasks yet!' : `No ${filter} tasks`}</em>
                 </div>
-              ))
+              ) : (
+                filteredTasks.map((task) => (
+                  <div
+                    key={task.id}
+                    className={`d-flex align-items-center gap-3 p-3 mb-2 border rounded-3 ${
+                      task.completed
+                        ? 'bg-light border-secondary'
+                        : 'bg-white border-light'
+                    }`}
+                    style={{ 
+                      transition: 'all 0.2s ease',
+                      cursor: 'pointer'
+                    }}
+                    onMouseEnter={(e) => {
+                      if (!task.completed) {
+                        e.target.style.borderColor = '#0d6efd';
+                      }
+                    }}
+                    onMouseLeave={(e) => {
+                      if (!task.completed) {
+                        e.target.style.borderColor = '#dee2e6';
+                      }
+                    }}
+                  >
+                    <button
+                      onClick={() => toggleTask(task.id)}
+                      className={`btn p-0 rounded-circle d-flex align-items-center justify-content-center ${
+                        task.completed
+                          ? 'btn-success'
+                          : 'btn-outline-secondary'
+                      }`}
+                      style={{ 
+                        width: '30px', 
+                        height: '30px',
+                        border: task.completed ? '2px solid #198754' : '2px solid #6c757d'
+                      }}
+                    >
+                      {task.completed && <Check size={14} />}
+                    </button>
+                    
+                    <span
+                      className={`flex-grow-1 ${
+                        task.completed
+                          ? 'text-muted text-decoration-line-through'
+                          : 'text-dark'
+                      }`}
+                      style={{ transition: 'all 0.2s ease' }}
+                    >
+                      {task.text}
+                    </span>
+                    
+                    <button
+                      onClick={() => deleteTask(task.id)}
+                      className="btn btn-link text-muted p-1"
+                      style={{ 
+                        transition: 'color 0.2s ease',
+                        textDecoration: 'none'
+                      }}
+                      onMouseEnter={(e) => e.target.style.color = '#dc3545'}
+                      onMouseLeave={(e) => e.target.style.color = '#6c757d'}
+                    >
+                      <X size={16} />
+                    </button>
+                  </div>
+                ))
+              )}
+            </div>
+
+            {/* Stats */}
+            {tasks.length > 0 && (
+              <div className="text-center small text-muted bg-light rounded-3 py-3">
+                <strong>{activeCount}</strong> active, <strong>{completedCount}</strong> completed
+              </div>
             )}
           </div>
-
-          {/* Stats */}
-          {tasks.length > 0 && (
-            <div className="text-center text-sm text-gray-600 bg-gray-50 rounded-lg py-3">
-              {activeCount} active, {completedCount} completed
-            </div>
-          )}
         </div>
       </div>
     </div>
