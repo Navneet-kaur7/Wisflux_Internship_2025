@@ -1,34 +1,47 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Plus, X, Check } from 'lucide-react';
 
 export default function TodoApp() {
-  const [tasks, setTasks] = useState([
-    { id: 1, text: 'Learn React', completed: false },
-    { id: 2, text: 'Build a todo app', completed: true },
-    { id: 3, text: 'Deploy the app', completed: false }
-  ]);
+  const [tasks, setTasks] = useState([]);
   const [newTask, setNewTask] = useState('');
   const [filter, setFilter] = useState('all');
 
-  const addTask = () => {
+  // Load tasks from database
+  useEffect(() => {
+    fetch('http://localhost:3000/api/tasks')
+      .then(res => res.json())
+      .then(data => setTasks(data));
+  }, []);
+
+  const addTask = async () => {
     if (newTask.trim()) {
-      setTasks([...tasks, {
-        id: Date.now(),
-        text: newTask.trim(),
-        completed: false
-      }]);
+      const response = await fetch('http://localhost:3000/api/tasks', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ text: newTask.trim() })
+      });
+      const task = await response.json();
+      setTasks([...tasks, task]);
       setNewTask('');
     }
   };
 
-  const deleteTask = (id) => {
+  const deleteTask = async (id) => {
+    await fetch(`http://localhost:3000/api/tasks/${id}`, {
+      method: 'DELETE'
+    });
     setTasks(tasks.filter(task => task.id !== id));
   };
 
-  const toggleTask = (id) => {
-    setTasks(tasks.map(task =>
-      task.id === id ? { ...task, completed: !task.completed } : task
-    ));
+  const toggleTask = async (id) => {
+    const task = tasks.find(t => t.id === id);
+    const response = await fetch(`http://localhost:3000/api/tasks/${id}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ completed: !task.completed })
+    });
+    const updatedTask = await response.json();
+    setTasks(tasks.map(t => t.id === id ? updatedTask : t));
   };
 
   const filteredTasks = tasks.filter(task => {
@@ -102,20 +115,7 @@ export default function TodoApp() {
                         ? 'bg-light border-secondary'
                         : 'bg-white border-light'
                     }`}
-                    style={{ 
-                      transition: 'all 0.2s ease',
-                      cursor: 'pointer'
-                    }}
-                    onMouseEnter={(e) => {
-                      if (!task.completed) {
-                        e.target.style.borderColor = '#0d6efd';
-                      }
-                    }}
-                    onMouseLeave={(e) => {
-                      if (!task.completed) {
-                        e.target.style.borderColor = '#dee2e6';
-                      }
-                    }}
+                    style={{ transition: 'all 0.2s ease' }}
                   >
                     <button
                       onClick={() => toggleTask(task.id)}
@@ -139,7 +139,6 @@ export default function TodoApp() {
                           ? 'text-muted text-decoration-line-through'
                           : 'text-dark'
                       }`}
-                      style={{ transition: 'all 0.2s ease' }}
                     >
                       {task.text}
                     </span>
@@ -147,12 +146,7 @@ export default function TodoApp() {
                     <button
                       onClick={() => deleteTask(task.id)}
                       className="btn btn-link text-muted p-1"
-                      style={{ 
-                        transition: 'color 0.2s ease',
-                        textDecoration: 'none'
-                      }}
-                      onMouseEnter={(e) => e.target.style.color = '#dc3545'}
-                      onMouseLeave={(e) => e.target.style.color = '#6c757d'}
+                      style={{ textDecoration: 'none' }}
                     >
                       <X size={16} />
                     </button>
