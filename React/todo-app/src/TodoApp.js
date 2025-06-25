@@ -11,22 +11,47 @@ export default function TodoApp() {
   const [error, setError] = useState(null);
   const [taskLoading, setTaskLoading] = useState({}); // Track loading state for individual tasks
 
+  // Get auth token from localStorage
+  const getAuthToken = () => {
+    return localStorage.getItem('token');
+  };
+
+  // Create headers with auth token
+  const getAuthHeaders = () => {
+    const token = getAuthToken();
+    return {
+      'Content-Type': 'application/json',
+      ...(token && { Authorization: `Bearer ${token}` })
+    };
+  };
+
   // Fetch tasks from the backend
   const fetchTasks = async () => {
     try {
       setLoading(true);
       setError(null);
-      const response = await fetch(`${API_BASE_URL}/tasks`);
+      
+      const token = getAuthToken();
+      if (!token) {
+        throw new Error('No authentication token found');
+      }
+
+      const response = await fetch(`${API_BASE_URL}/tasks`, {
+        headers: getAuthHeaders()
+      });
       
       if (!response.ok) {
+        if (response.status === 401) {
+          throw new Error('Authentication failed. Please log in again.');
+        }
         throw new Error(`HTTP error! status: ${response.status}`);
       }
       
       const data = await response.json();
-      setTasks(data);
+      setTasks(Array.isArray(data) ? data : []);
     } catch (err) {
       console.error('Error fetching tasks:', err);
-      setError('Failed to load tasks. Please check if the server is running.');
+      setError(err.message || 'Failed to load tasks. Please check if the server is running.');
     } finally {
       setLoading(false);
     }
@@ -45,22 +70,23 @@ export default function TodoApp() {
       setError(null);
       const response = await fetch(`${API_BASE_URL}/tasks`, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
+        headers: getAuthHeaders(),
         body: JSON.stringify({ text: newTask.trim() }),
       });
 
       if (!response.ok) {
+        if (response.status === 401) {
+          throw new Error('Authentication failed. Please log in again.');
+        }
         throw new Error(`HTTP error! status: ${response.status}`);
       }
 
       const newTaskData = await response.json();
-      setTasks([...tasks, newTaskData]);
+      setTasks([newTaskData, ...tasks]); // Add new task to the beginning
       setNewTask('');
     } catch (err) {
       console.error('Error adding task:', err);
-      setError('Failed to add task. Please try again.');
+      setError(err.message || 'Failed to add task. Please try again.');
     }
   };
 
@@ -72,16 +98,20 @@ export default function TodoApp() {
       
       const response = await fetch(`${API_BASE_URL}/tasks/${id}`, {
         method: 'DELETE',
+        headers: getAuthHeaders()
       });
 
       if (!response.ok) {
+        if (response.status === 401) {
+          throw new Error('Authentication failed. Please log in again.');
+        }
         throw new Error(`HTTP error! status: ${response.status}`);
       }
 
       setTasks(tasks.filter(task => task.id !== id));
     } catch (err) {
       console.error('Error deleting task:', err);
-      setError('Failed to delete task. Please try again.');
+      setError(err.message || 'Failed to delete task. Please try again.');
     } finally {
       setTaskLoading(prev => ({ ...prev, [id]: false }));
     }
@@ -98,13 +128,14 @@ export default function TodoApp() {
       
       const response = await fetch(`${API_BASE_URL}/tasks/${id}`, {
         method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-        },
+        headers: getAuthHeaders(),
         body: JSON.stringify({ completed: !task.completed }),
       });
 
       if (!response.ok) {
+        if (response.status === 401) {
+          throw new Error('Authentication failed. Please log in again.');
+        }
         throw new Error(`HTTP error! status: ${response.status}`);
       }
 
@@ -112,7 +143,7 @@ export default function TodoApp() {
       setTasks(tasks.map(t => t.id === id ? updatedTask : t));
     } catch (err) {
       console.error('Error toggling task:', err);
-      setError('Failed to update task. Please try again.');
+      setError(err.message || 'Failed to update task. Please try again.');
     } finally {
       setTaskLoading(prev => ({ ...prev, [id]: false }));
     }
@@ -124,16 +155,20 @@ export default function TodoApp() {
       setError(null);
       const response = await fetch(`${API_BASE_URL}/tasks/completed`, {
         method: 'DELETE',
+        headers: getAuthHeaders()
       });
 
       if (!response.ok) {
+        if (response.status === 401) {
+          throw new Error('Authentication failed. Please log in again.');
+        }
         throw new Error(`HTTP error! status: ${response.status}`);
       }
 
       setTasks(tasks.filter(task => !task.completed));
     } catch (err) {
       console.error('Error clearing completed tasks:', err);
-      setError('Failed to clear completed tasks. Please try again.');
+      setError(err.message || 'Failed to clear completed tasks. Please try again.');
     }
   };
 

@@ -4,13 +4,13 @@ const { protect } = require('../middleware/auth');
 
 const router = express.Router();
 
-// PostgreSQL connection
+// PostgreSQL connection pool
 const pool = new Pool({
   host: process.env.DB_HOST || 'localhost',
   port: process.env.DB_PORT || 5432,
   database: process.env.DB_NAME || 'postgres',
   user: process.env.DB_USER || 'postgres',
-  password: process.env.DB_PASSWORD || 'user',
+  password: process.env.DB_PASSWORD || 'user'
 });
 
 // Test database connection
@@ -22,35 +22,35 @@ pool.on('error', (err) => {
   console.error('PostgreSQL connection error:', err);
 });
 
-// Create tasks table if it doesn't exist
-const createTasksTable = async () => {
+// Initialize tasks table
+const initializeTable = async () => {
   try {
     await pool.query(`
       CREATE TABLE IF NOT EXISTS tasks (
         id SERIAL PRIMARY KEY,
-        user_id VARCHAR(255) NOT NULL,
-        text TEXT NOT NULL,
+        text VARCHAR(255) NOT NULL,
         completed BOOLEAN DEFAULT FALSE,
+        user_id VARCHAR(255),
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       )
     `);
-    console.log('Tasks table ready');
+    console.log('Tasks table initialized');
   } catch (error) {
-    console.error('Error creating tasks table:', error);
+    console.error('Error initializing tasks table:', error);
   }
 };
 
-createTasksTable();
+// Initialize table when server starts
+initializeTable();
 
-// @desc    Get all tasks for authenticated user
-// @route   GET /api/tasks
-// @access  Private
+// GET /api/tasks - Get all tasks for authenticated user
 router.get('/', protect, async (req, res) => {
   try {
+    const userId = req.user._id.toString();
     const result = await pool.query(
-      'SELECT * FROM tasks WHERE user_id = $1 ORDER BY created_at DESC',
-      [req.user._id.toString()]
+      'SELECT id, text, completed, created_at, updated_at FROM tasks WHERE user_id = $1 ORDER BY created_at DESC',
+      [userId]
     );
     
     res.json(result.rows);
@@ -58,19 +58,19 @@ router.get('/', protect, async (req, res) => {
     console.error('Error fetching tasks:', error);
     res.status(500).json({
       success: false,
-      message: 'Server error fetching tasks'
+      message: 'Error fetching tasks',
+      error: error.message
     });
   }
 });
 
-// @desc    Create a new task
-// @route   POST /api/tasks
-// @access  Private
+// POST /api/tasks - Create a new task
 router.post('/', protect, async (req, res) => {
   try {
     const { text } = req.body;
-    
-    if (!text || text.trim().length === 0) {
+    const userId = req.user._id.toString();
+
+    if (!text || !text.trim()) {
       return res.status(400).json({
         success: false,
         message: 'Task text is required'
@@ -78,8 +78,8 @@ router.post('/', protect, async (req, res) => {
     }
 
     const result = await pool.query(
-      'INSERT INTO tasks (user_id, text) VALUES ($1, $2) RETURNING *',
-      [req.user._id.toString(), text.trim()]
+      'INSERT INTO tasks (text, user_id) VALUES ($1, $2) RETURNING id, text, completed, created_at, updated_at',
+      [text.trim(), userId]
     );
 
     res.status(201).json(result.rows[0]);
@@ -87,95 +87,96 @@ router.post('/', protect, async (req, res) => {
     console.error('Error creating task:', error);
     res.status(500).json({
       success: false,
-      message: 'Server error creating task'
+      message: 'Error creating task',
+      error: error.message
     });
   }
 });
 
-// @desc    Update a task
-// @route   PUT /api/tasks/:id
-// @access  Private
+// PUT /api/tasks/:id - Update a task
 router.put('/:id', protect, async (req, res) => {
   try {
     const { id } = req.params;
     const { text, completed } = req.body;
+    const userId = req.user._id.toString();
 
-    // Check if task exists and belongs to user
-    const existingTask = await pool.query(
-      'SELECT * FROM tasks WHERE id = $1 AND user_id = $2',
-      [id, req.user._id.toString()]
+    // First check if task exists and belongs to user
+    const checkResult = await pool.query(
+      'SELECT id FROM tasks WHERE id = $1 AND user_id = $2',
+      [id, userId]
     );
 
-    if (existingTask.rows.length === 0) {
+    if (checkResult.rows.length === 0) {
       return res.status(404).json({
         success: false,
-        message: 'Task not found'
+        message: 'Task not found or unauthorized'
       });
     }
 
-    // Build update query dynamically
-    let updateFields = [];
-    let values = [];
-    let paramCount = 1;
+    // Update the task
+    let query = 'UPDATE tasks SET updated_at = CURRENT_TIMESTAMP';
+    let params = [];
+    let paramCount = 0;
 
     if (text !== undefined) {
-      updateFields.push(`text = $${paramCount}`);
-      values.push(text.trim());
       paramCount++;
+      query += `, text = $${paramCount}`;
+      params.push(text.trim());
     }
 
     if (completed !== undefined) {
-      updateFields.push(`completed = $${paramCount}`);
-      values.push(completed);
       paramCount++;
+      query += `, completed = $${paramCount}`;
+      params.push(completed);
     }
 
-    updateFields.push(`updated_at = $${paramCount}`);
-    values.push(new Date());
     paramCount++;
+    query += ` WHERE id = $${paramCount}`;
+    params.push(id);
 
-    values.push(id);
-    values.push(req.user._id.toString());
+    paramCount++;
+    query += ` AND user_id = $${paramCount}`;
+    params.push(userId);
 
-    const result = await pool.query(
-      `UPDATE tasks SET ${updateFields.join(', ')} WHERE id = $${paramCount} AND user_id = $${paramCount + 1} RETURNING *`,
-      values
-    );
+    query += ' RETURNING id, text, completed, created_at, updated_at';
+
+    const result = await pool.query(query, params);
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({
+        success: false,
+        message: 'Task not found or unauthorized'
+      });
+    }
 
     res.json(result.rows[0]);
   } catch (error) {
     console.error('Error updating task:', error);
     res.status(500).json({
       success: false,
-      message: 'Server error updating task'
+      message: 'Error updating task',
+      error: error.message
     });
   }
 });
 
-// @desc    Delete a task
-// @route   DELETE /api/tasks/:id
-// @access  Private
+// DELETE /api/tasks/:id - Delete a task
 router.delete('/:id', protect, async (req, res) => {
   try {
     const { id } = req.params;
+    const userId = req.user._id.toString();
 
-    // Check if task exists and belongs to user
-    const existingTask = await pool.query(
-      'SELECT * FROM tasks WHERE id = $1 AND user_id = $2',
-      [id, req.user._id.toString()]
+    const result = await pool.query(
+      'DELETE FROM tasks WHERE id = $1 AND user_id = $2 RETURNING id',
+      [id, userId]
     );
 
-    if (existingTask.rows.length === 0) {
+    if (result.rows.length === 0) {
       return res.status(404).json({
         success: false,
-        message: 'Task not found'
+        message: 'Task not found or unauthorized'
       });
     }
-
-    await pool.query(
-      'DELETE FROM tasks WHERE id = $1 AND user_id = $2',
-      [id, req.user._id.toString()]
-    );
 
     res.json({
       success: true,
@@ -185,55 +186,32 @@ router.delete('/:id', protect, async (req, res) => {
     console.error('Error deleting task:', error);
     res.status(500).json({
       success: false,
-      message: 'Server error deleting task'
+      message: 'Error deleting task',
+      error: error.message
     });
   }
 });
 
-// @desc    Delete all completed tasks
-// @route   DELETE /api/tasks/completed
-// @access  Private
+// DELETE /api/tasks/completed - Delete all completed tasks
 router.delete('/completed', protect, async (req, res) => {
   try {
+    const userId = req.user._id.toString();
+
     const result = await pool.query(
-      'DELETE FROM tasks WHERE user_id = $1 AND completed = true RETURNING *',
-      [req.user._id.toString()]
+      'DELETE FROM tasks WHERE completed = TRUE AND user_id = $1 RETURNING id',
+      [userId]
     );
 
     res.json({
       success: true,
-      message: `${result.rows.length} completed tasks deleted`,
-      deletedCount: result.rows.length
+      message: `Deleted ${result.rows.length} completed tasks`
     });
   } catch (error) {
     console.error('Error deleting completed tasks:', error);
     res.status(500).json({
       success: false,
-      message: 'Server error deleting completed tasks'
-    });
-  }
-});
-
-// @desc    Get task statistics
-// @route   GET /api/tasks/stats
-// @access  Private
-router.get('/stats', protect, async (req, res) => {
-  try {
-    const result = await pool.query(
-      `SELECT 
-        COUNT(*) as total,
-        COUNT(CASE WHEN completed = true THEN 1 END) as completed,
-        COUNT(CASE WHEN completed = false THEN 1 END) as active
-       FROM tasks WHERE user_id = $1`,
-      [req.user._id.toString()]
-    );
-
-    res.json(result.rows[0]);
-  } catch (error) {
-    console.error('Error fetching task stats:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Server error fetching task statistics'
+      message: 'Error deleting completed tasks',
+      error: error.message
     });
   }
 });
