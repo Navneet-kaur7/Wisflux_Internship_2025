@@ -38,7 +38,7 @@ function App() {
             />
             
             {/* Default redirect */}
-            <Route path="/" element={<Navigate to="/dashboard" replace />} />
+            <Route path="/" element={<Navigate to="/login" replace />} />
             
             {/* Catch all route - redirect to dashboard */}
             <Route path="*" element={<Navigate to="/dashboard" replace />} />

@@ -117,6 +117,71 @@ router.get('/me', protect, async (req, res) => {
   }
 });
 
+// GET /api/auth/profile - Get current user profile (matches AuthContext expectation)
+router.get('/profile', protect, async (req, res) => {
+  try {
+    res.json({
+      success: true,
+      user: {
+        id: req.user._id,
+        name: req.user.name,
+        email: req.user.email
+      }
+    });
+  } catch (error) {
+    console.error('Get profile error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Server error getting user profile',
+      error: error.message
+    });
+  }
+});
+
+// PUT /api/auth/profile - Update user profile
+router.put('/profile', protect, async (req, res) => {
+  try {
+    const { name } = req.body;
+    
+    if (!name || !name.trim()) {
+      return res.status(400).json({
+        success: false,
+        message: 'Name is required'
+      });
+    }
+
+    const user = await User.findByIdAndUpdate(
+      req.user._id,
+      { name: name.trim() },
+      { new: true, runValidators: true }
+    );
+
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: 'User not found'
+      });
+    }
+
+    res.json({
+      success: true,
+      message: 'Profile updated successfully',
+      user: {
+        id: user._id,
+        name: user.name,
+        email: user.email
+      }
+    });
+  } catch (error) {
+    console.error('Update profile error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Server error updating profile',
+      error: error.message
+    });
+  }
+});
+
 // POST /api/auth/logout - Logout user (optional - mainly for clearing client-side token)
 router.post('/logout', (req, res) => {
   res.json({

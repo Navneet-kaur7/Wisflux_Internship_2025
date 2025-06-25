@@ -11,9 +11,9 @@ export default function TodoApp() {
   const [error, setError] = useState(null);
   const [taskLoading, setTaskLoading] = useState({}); // Track loading state for individual tasks
 
-  // Get auth token from localStorage
+  // Get auth token from localStorage - FIXED: using consistent key
   const getAuthToken = () => {
-    return localStorage.getItem('token');
+    return localStorage.getItem('todoapp_token'); // Changed from 'token' to 'todoapp_token'
   };
 
   // Create headers with auth token
@@ -36,6 +36,8 @@ export default function TodoApp() {
         throw new Error('No authentication token found');
       }
 
+      console.log('Fetching tasks with token:', token ? 'Token present' : 'No token'); // Debug log
+
       const response = await fetch(`${API_BASE_URL}/tasks`, {
         headers: getAuthHeaders()
       });
@@ -48,6 +50,7 @@ export default function TodoApp() {
       }
       
       const data = await response.json();
+      console.log('Fetched tasks:', data); // Debug log
       setTasks(Array.isArray(data) ? data : []);
     } catch (err) {
       console.error('Error fetching tasks:', err);
@@ -68,20 +71,28 @@ export default function TodoApp() {
 
     try {
       setError(null);
+      console.log('Adding task:', newTask.trim()); // Debug log
+      
       const response = await fetch(`${API_BASE_URL}/tasks`, {
         method: 'POST',
         headers: getAuthHeaders(),
         body: JSON.stringify({ text: newTask.trim() }),
       });
 
+      console.log('Add task response status:', response.status); // Debug log
+
       if (!response.ok) {
+        const errorData = await response.json();
+        console.error('Add task error response:', errorData); // Debug log
+        
         if (response.status === 401) {
           throw new Error('Authentication failed. Please log in again.');
         }
-        throw new Error(`HTTP error! status: ${response.status}`);
+        throw new Error(errorData.message || `HTTP error! status: ${response.status}`);
       }
 
       const newTaskData = await response.json();
+      console.log('New task created:', newTaskData); // Debug log
       setTasks([newTaskData, ...tasks]); // Add new task to the beginning
       setNewTask('');
     } catch (err) {
@@ -212,6 +223,13 @@ export default function TodoApp() {
                 Connected to PostgreSQL
               </small>
             </h1>
+            
+            {/* Debug Info */}
+            <div className="alert alert-info small mb-3">
+              Token: {getAuthToken() ? '✓ Present' : '✗ Missing'} | 
+              Tasks: {tasks.length} | 
+              API: {API_BASE_URL}
+            </div>
             
             {/* Error Message */}
             {error && (
