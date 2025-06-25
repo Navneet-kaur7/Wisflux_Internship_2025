@@ -1,61 +1,62 @@
 const express = require('express');
 const cors = require('cors');
-const { Pool } = require('pg');
-require('dotenv').config();
+const dotenv = require('dotenv');
+const mongoose = require('mongoose');
 
-// Import MongoDB connection
-const connectMongoDB = require('./config/database');
+// Load environment variables
+dotenv.config();
 
 // Import routes
 const authRoutes = require('./routes/auth');
 const taskRoutes = require('./routes/tasks');
 
 const app = express();
-const PORT = process.env.PORT || 5000;
-
-// Connect to MongoDB
-connectMongoDB();
 
 // Middleware
-app.use(cors());
+app.use(cors({
+  origin: process.env.FRONTEND_URL || 'http://localhost:3000',
+  credentials: true
+}));
 app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
 
-// PostgreSQL connection (for todos)
-const pool = new Pool({
-  user: process.env.DB_USER || 'postgres',
-  host: process.env.DB_HOST || 'localhost',
-  database: process.env.DB_NAME || 'postgres',
-  password: process.env.DB_PASSWORD || 'user',
-  port: process.env.DB_PORT || 5432,
-});
-
-// Test PostgreSQL connection
-pool.connect((err, client, release) => {
-  if (err) {
-    console.error('Error connecting to PostgreSQL database:', err);
-  } else {
-    console.log('Connected to PostgreSQL database successfully');
-    release();
+// Connect to MongoDB for user authentication
+const connectMongoDB = async () => {
+  try {
+    const conn = await mongoose.connect(process.env.MONGODB_URI);
+    console.log(`MongoDB Connected: ${conn.connection.host}`);
+  } catch (error) {
+    console.error('MongoDB connection error:', error);
+    process.exit(1);
   }
-});
+};
 
-// Make pool available to routes
-app.locals.pool = pool;
+connectMongoDB();
 
 // Routes
 app.use('/api/auth', authRoutes);
 app.use('/api/tasks', taskRoutes);
 
-// Health check endpoint
+// Health check route
 app.get('/api/health', (req, res) => {
-  res.json({ 
-    status: 'OK', 
-    message: 'Todo API with Authentication is running',
+  res.json({
+    success: true,
+    message: 'Server is running',
     timestamp: new Date().toISOString()
   });
 });
 
-// 404 handler
+// Error handling middleware
+app.use((err, req, res, next) => {
+  console.error(err.stack);
+  res.status(500).json({
+    success: false,
+    message: 'Something went wrong!',
+    error: process.env.NODE_ENV === 'development' ? err.message : undefined
+  });
+});
+
+// Handle 404 routes
 app.use('*', (req, res) => {
   res.status(404).json({
     success: false,
@@ -63,24 +64,11 @@ app.use('*', (req, res) => {
   });
 });
 
-// Global error handler
-app.use((err, req, res, next) => {
-  console.error('Global error:', err);
-  res.status(500).json({
-    success: false,
-    message: 'Something went wrong!'
-  });
-});
+const PORT = process.env.PORT || 5000;
 
-// Start server
 app.listen(PORT, () => {
-  console.log(`Server is running on port ${PORT}`);
+  console.log(`Server running on port ${PORT}`);
   console.log(`Environment: ${process.env.NODE_ENV}`);
 });
 
-// Graceful shutdown
-process.on('SIGINT', async () => {
-  console.log('Shutting down gracefully...');
-  await pool.end();
-  process.exit(0);
-});
+module.exports = app;
