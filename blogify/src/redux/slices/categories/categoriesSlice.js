@@ -11,7 +11,7 @@ import BASE_URL from "../../../utils/baseURL";
 const INITIAL_STATE = {
   loading: false,
   error: null,
-  categories: [],
+  categories: ["AI", "Technology", "Health", "Lifestyle", "Travel", "Food", "Education", "Finance", "Entertainment", "Sports"],
   category: null,
   success: false,
 };
