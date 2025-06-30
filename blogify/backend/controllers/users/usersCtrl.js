@@ -10,56 +10,76 @@ const sendAccVerificationEmail = require("../../utils/sendAccVerificationEmail")
 //@desc Register a new user
 //@route POST /api/v1/users/register
 //@access public
-
 exports.register = asyncHandler(async (req, res) => {
-  //get the details
-  const { username, password, email } = req.body;
-  //! Check if user exists
-  const user = await User.findOne({ username });
-  if (user) {
-    throw new Error("User Already Exists");
+  try {
+    const { username, password, email } = req.body;
+    
+    if (!username || !password || !email) {
+      return res.status(400).json({
+        status: "failed",
+        message: "Please provide username, password, and email"
+      });
+    }
+
+    const existingUser = await User.findOne({ 
+      $or: [{ username }, { email }] 
+    });
+    
+    if (existingUser) {
+      return res.status(400).json({
+        status: "failed",
+        message: existingUser.username === username ? "Username already exists" : "Email already exists"
+      });
+    }
+
+    const salt = await bcrypt.genSalt(10);
+    const hashedPassword = await bcrypt.hash(password, salt);
+
+    const newUser = new User({
+      username,
+      email,
+      password: hashedPassword,
+    });
+
+    await newUser.save();
+
+    const userResponse = newUser.toObject();
+    delete userResponse.password;
+
+    res.status(201).json({
+      status: "success",
+      message: "User registered successfully",
+      user: userResponse,
+    });
+
+  } catch (error) {
+    console.error("Registration error:", error);
+    res.status(500).json({
+      status: "failed",
+      message: "Internal server error during registration"
+    });
   }
-  //Register new user
-  const newUser = new User({
-    username,
-    email,
-    password,
-  });
-  //! hash password
-  const salt = await bcrypt.genSalt(10);
-  newUser.password = await bcrypt.hash(password, salt);
-  //save
-  await newUser.save();
-  res.status(201).json({
-    status: "success",
-    message: "User Registered Successfully",
-    // _id: newUser?._id,
-    // username: newUser?.username,
-    // email: newUser?.email,
-    // role: newUser?.role,
-    newUser,
-  });
 });
 
-//@desc Login  user
+//@desc Login user
 //@route POST /api/v1/users/login
 //@access public
-
 exports.login = asyncHandler(async (req, res) => {
-  //? get the login details
   const { username, password } = req.body;
-  //! Check if exists
+  
   const user = await User.findOne({ username });
   if (!user) {
     throw new Error("Invalid login credentials");
   }
-  //compare the hashed password with the one the request
+  
   const isMatched = await bcrypt.compare(password, user?.password);
   if (!isMatched) {
     throw new Error("Invalid login credentials");
   }
-  //Update the last login
+  
   user.lastLogin = new Date();
+  await user.save();
+  
   res.json({
     status: "success",
     email: user?.email,
@@ -72,12 +92,10 @@ exports.login = asyncHandler(async (req, res) => {
   });
 });
 
-//@desc  Get profile
+//@desc Get profile
 //@route GET /api/v1/users/profile/
 //@access Private
-
 exports.getProfile = asyncHandler(async (req, res, next) => {
-  //! get user id from params
   const id = req.userAuth._id;
   const user = await User.findById(id)
     .populate({
@@ -107,12 +125,10 @@ exports.getProfile = asyncHandler(async (req, res, next) => {
   });
 });
 
-//@desc  Get profile
+//@desc Get public profile
 //@route GET /api/v1/users/public-profile/:userId
 //@access Public
-
 exports.getPublicProfile = asyncHandler(async (req, res, next) => {
-  //! get user id from params
   const userId = req.params.userId;
   const user = await User.findById(userId)
     .select("-password")
@@ -129,62 +145,58 @@ exports.getPublicProfile = asyncHandler(async (req, res, next) => {
   });
 });
 
-//@desc   Block user
-//@route  PUT /api/v1/users/block/:userIdToBlock
+//@desc Block user
+//@route PUT /api/v1/users/block/:userIdToBlock
 //@access Private
-
 exports.blockUser = asyncHandler(async (req, res) => {
-  //* Find the user to be blocked
   const userIdToBlock = req.params.userIdToBlock;
   const userToBlock = await User.findById(userIdToBlock);
   if (!userToBlock) {
     throw new Error("User to block not found");
   }
-  // ! user who is blocking
+  
   const userBlocking = req.userAuth._id;
-  // check if user is blocking him/herself
+  
   if (userIdToBlock.toString() === userBlocking.toString()) {
     throw new Error("Cannot block yourself");
   }
-  //find the current user
+  
   const currentUser = await User.findById(userBlocking);
-  //? Check if user already blocked
+  
   if (currentUser?.blockedUsers?.includes(userIdToBlock)) {
     throw new Error("User already blocked");
   }
-  //push the user to be blocked in the array of the current user
+  
   currentUser.blockedUsers.push(userIdToBlock);
   await currentUser.save();
+  
   res.json({
     message: "User blocked successfully",
     status: "success",
   });
 });
 
-//@desc   unBlock user
-//@route  PUT /api/v1/users/unblock/:userIdToUnBlock
+//@desc Unblock user
+//@route PUT /api/v1/users/unblock/:userIdToUnBlock
 //@access Private
-
 exports.unblockUser = asyncHandler(async (req, res) => {
-  //* Find the user to be unblocked
   const userIdToUnBlock = req.params.userIdToUnBlock;
   const userToUnBlock = await User.findById(userIdToUnBlock);
   if (!userToUnBlock) {
     throw new Error("User to be unblock not found");
   }
-  //find the current user
+  
   const userUnBlocking = req.userAuth._id;
   const currentUser = await User.findById(userUnBlocking);
 
-  //check if user is blocked before unblocking
   if (!currentUser.blockedUsers.includes(userIdToUnBlock)) {
-    throw new Error("User not block");
+    throw new Error("User not blocked");
   }
-  //remove the user from the current user blocked users array
+  
   currentUser.blockedUsers = currentUser.blockedUsers.filter(
     (id) => id.toString() !== userIdToUnBlock.toString()
   );
-  //resave the current user
+  
   await currentUser.save();
   res.json({
     status: "success",
@@ -192,287 +204,238 @@ exports.unblockUser = asyncHandler(async (req, res) => {
   });
 });
 
-//@desc   who view my profile
-//@route  GET /api/v1/users/profile-viewer/:userProfileId
+//@desc Profile viewers
+//@route GET /api/v1/users/profile-viewer/:userProfileId
 //@access Private
-
 exports.profileViewers = asyncHandler(async (req, res) => {
-  //* Find that we want to view his profile
   const userProfileId = req.params.userProfileId;
-
   const userProfile = await User.findById(userProfileId);
   if (!userProfile) {
     throw new Error("User to view his profile not found");
   }
 
-  //find the current user
   const currentUserId = req.userAuth._id;
-  //? Check if user already viewed the profile
+  
   if (userProfile?.profileViewers?.includes(currentUserId)) {
     throw new Error("You have already viewed this profile");
   }
-  //push the user current user id into the user profile
+  
   userProfile.profileViewers.push(currentUserId);
   await userProfile.save();
+  
   res.json({
     message: "You have successfully viewed his/her profile",
     status: "success",
   });
 });
 
-//@desc   Follwing user
-//@route  PUT /api/v1/users/following/:userIdToFollow
+//@desc Following user
+//@route PUT /api/v1/users/following/:userIdToFollow
 //@access Private
-
 exports.followingUser = asyncHandler(async (req, res) => {
-  //Find the current user
   const currentUserId = req.userAuth._id;
-  //! Find the user to follow
   const userToFollowId = req.params.userToFollowId;
-  //Avoid user following himself
+  
   if (currentUserId.toString() === userToFollowId.toString()) {
     throw new Error("You cannot follow yourself");
   }
-  //Push the usertofolowID into the current user following field
+  
   await User.findByIdAndUpdate(
     currentUserId,
-    {
-      $addToSet: { following: userToFollowId },
-    },
-    {
-      new: true,
-    }
+    { $addToSet: { following: userToFollowId } },
+    { new: true }
   );
-  //Push the currentUserId into the user to follow followers field
+  
   await User.findByIdAndUpdate(
     userToFollowId,
-    {
-      $addToSet: { followers: currentUserId },
-    },
-    {
-      new: true,
-    }
+    { $addToSet: { followers: currentUserId } },
+    { new: true }
   );
-  //send the response
+  
   res.json({
     status: "success",
     message: "You have followed the user successfully",
   });
 });
 
-//@desc   UnFollwing user
-//@route  PUT /api/v1/users/unfollowing/:userIdToUnFollow
+//@desc Unfollowing user
+//@route PUT /api/v1/users/unfollowing/:userIdToUnFollow
 //@access Private
-
 exports.unFollowingUser = asyncHandler(async (req, res) => {
-  //Find the current user
   const currentUserId = req.userAuth._id;
-  //! Find the user to unfollow
   const userToUnFollowId = req.params.userToUnFollowId;
 
-  //Avoid user unfollowing himself
   if (currentUserId.toString() === userToUnFollowId.toString()) {
     throw new Error("You cannot unfollow yourself");
   }
-  //Remove the usertoUnffolowID from the current user following field
+  
   await User.findByIdAndUpdate(
     currentUserId,
-    {
-      $pull: { following: userToUnFollowId },
-    },
-    {
-      new: true,
-    }
+    { $pull: { following: userToUnFollowId } },
+    { new: true }
   );
-  //Remove the currentUserId from the user to unfollow followers field
+  
   await User.findByIdAndUpdate(
     userToUnFollowId,
-    {
-      $pull: { followers: currentUserId },
-    },
-    {
-      new: true,
-    }
+    { $pull: { followers: currentUserId } },
+    { new: true }
   );
-  //send the response
+  
   res.json({
     status: "success",
     message: "You have unfollowed the user successfully",
   });
 });
 
-// @route   POST /api/v1/users/forgot-password
-// @desc   Forgot password
-// @access  Public
-
+//@desc Forgot password
+//@route POST /api/v1/users/forgot-password
+//@access Public
 exports.forgotpassword = expressAsyncHandler(async (req, res) => {
   const { email } = req.body;
-  //Find the email in our db
   const userFound = await User.findOne({ email });
   if (!userFound) {
     throw new Error("There's No Email In Our System");
   }
-  //Create token
+  
   const resetToken = await userFound.generatePasswordResetToken();
-  //resave the user
   await userFound.save();
 
-  //send email
   sendEmail(email, resetToken);
   res.status(200).json({ message: "Password reset email sent", resetToken });
 });
-// @route   POST /api/v1/users/reset-password/:resetToken
-// @desc   Reset password
-// @access  Public
 
+//@desc Reset password
+//@route POST /api/v1/users/reset-password/:resetToken
+//@access Public
 exports.resetPassword = expressAsyncHandler(async (req, res) => {
-  //Get the id/token from email /params
   const { resetToken } = req.params;
   const { password } = req.body;
-  //Convert the token to actual token that has been saved in the db
+  
   const cryptoToken = crypto
     .createHash("sha256")
     .update(resetToken)
     .digest("hex");
-  //find the user by the crypto token
+    
   const userFound = await User.findOne({
     passwordResetToken: cryptoToken,
     passwordResetExpires: { $gt: Date.now() },
   });
+  
   if (!userFound) {
     throw new Error("Password reset token is invalid or has expired");
   }
-  //Update the user password
+  
   const salt = await bcrypt.genSalt(10);
   userFound.password = await bcrypt.hash(password, salt);
   userFound.passwordResetExpires = undefined;
   userFound.passwordResetToken = undefined;
-  //resave the user
+  
   await userFound.save();
   res.status(200).json({ message: "Password reset successfully" });
 });
 
-// @route   POST /api/v1/users/account-verification-email/
-// @desc    Send Account verification email
-// @access  Private
-
+//@desc Send account verification email
+//@route POST /api/v1/users/account-verification-email/
+//@access Private
 exports.accountVerificationEmail = expressAsyncHandler(async (req, res) => {
-  //Find the login user email
   const user = await User.findById(req?.userAuth?._id);
   if (!user) {
     throw new Error("User not found");
   }
-  //send the token
+  
   const token = await user.generateAccVerificationToken();
-  //resave
   await user.save();
-  //send the email
+  
   sendAccVerificationEmail(user?.email, token);
   res.status(200).json({
     message: `Account verification email sent ${user?.email}`,
   });
 });
 
-// @route   POST /api/v1/users/verify-account/:verifyToken
-// @desc    Verify token
-// @access  Private
-
+//@desc Verify account
+//@route POST /api/v1/users/verify-account/:verifyToken
+//@access Private
 exports.verifyAccount = expressAsyncHandler(async (req, res) => {
-  //Get the id/token params
   const { verifyToken } = req.params;
-  //Convert the token to actual token that has been saved in the db
+  
   const cryptoToken = crypto
     .createHash("sha256")
     .update(verifyToken)
     .digest("hex");
-  //find the user by the crypto token
+    
   const userFound = await User.findOne({
     accountVerificationToken: cryptoToken,
     accountVerificationExpires: { $gt: Date.now() },
   });
+  
   if (!userFound) {
-    throw new Error("Account verification  token is invalid or has expired");
+    throw new Error("Account verification token is invalid or has expired");
   }
-  //Update user account
+  
   userFound.isVerified = true;
   userFound.accountVerificationExpires = undefined;
   userFound.accountVerificationToken = undefined;
-  //resave the user
+  
   await userFound.save();
-  res.status(200).json({ message: "Account  successfully verified" });
+  res.status(200).json({ message: "Account successfully verified" });
 });
 
-//@desc  Upload profile image
-//@route  PUT /api/v1/users/upload-profile-image
+//@desc Upload profile picture
+//@route PUT /api/v1/users/upload-profile-image
 //@access Private
-
-exports.uploadeProfilePicture = asyncHandler(async (req, res) => {
-  // Find the user
+exports.uploadProfilePicture = asyncHandler(async (req, res) => {
   const userFound = await User.findById(req?.userAuth?._id);
   if (!userFound) {
     throw new Error("User not found");
   }
+  
   const user = await User.findByIdAndUpdate(
     req?.userAuth?._id,
-    {
-      $set: { profilePicture: req?.file?.path },
-    },
-    {
-      new: true,
-    }
+    { $set: { profilePicture: req?.file?.path } },
+    { new: true }
   );
 
-  //? send the response
   res.json({
-    status: "scuccess",
-    message: "User profile image updated Succesfully",
+    status: "success",
+    message: "User profile image updated successfully",
     user,
   });
 });
 
-//@desc   Upload cover image
-//@route  PUT /api/v1/users/upload-cover-image
+//@desc Upload cover image
+//@route PUT /api/v1/users/upload-cover-image
 //@access Private
-
-exports.uploadeCoverImage = asyncHandler(async (req, res) => {
-  // Find the user
+exports.uploadCoverImage = asyncHandler(async (req, res) => {
   const userFound = await User.findById(req?.userAuth?._id);
   if (!userFound) {
     throw new Error("User not found");
   }
+  
   const user = await User.findByIdAndUpdate(
     req?.userAuth?._id,
-    {
-      $set: { coverImage: req?.file?.path },
-    },
-    {
-      new: true,
-    }
+    { $set: { coverImage: req?.file?.path } },
+    { new: true }
   );
 
-  //? send the response
   res.json({
-    status: "scuccess",
-    message: "User cover image updated Succesfully",
+    status: "success",
+    message: "User cover image updated successfully",
     user,
   });
 });
 
-//@desc   Update username/email
-//@route  PUT /api/v1/users/update-profile
+//@desc Update user profile
+//@route PUT /api/v1/users/update-profile
 //@access Private
-
 exports.updateUserProfile = asyncHandler(async (req, res) => {
-  //!Check if the post exists
   const userId = req.userAuth?._id;
   const userFound = await User.findById(userId);
   if (!userFound) {
     throw new Error("User not found");
   }
-  console.log(userFound);
-  //! image update
+  
   const { username, email } = req.body;
-  const post = await User.findByIdAndUpdate(
+  const updatedUser = await User.findByIdAndUpdate(
     userId,
     {
       email: email ? email : userFound?.email,
@@ -483,9 +446,10 @@ exports.updateUserProfile = asyncHandler(async (req, res) => {
       runValidators: true,
     }
   );
-  res.status(201).json({
+  
+  res.status(200).json({
     status: "success",
     message: "User successfully updated",
-    post,
+    user: updatedUser,
   });
 });
