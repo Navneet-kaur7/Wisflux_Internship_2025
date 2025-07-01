@@ -163,6 +163,7 @@ export const dislikePostAction = createAsyncThunk(
   }
 );
 // ! Create post
+// ! Create post
 export const addPostAction = createAsyncThunk(
   "post/create",
   async (payload, { rejectWithValue, getState, dispatch }) => {
@@ -171,8 +172,8 @@ export const addPostAction = createAsyncThunk(
       const formData = new FormData();
       formData.append("title", payload?.title);
       formData.append("content", payload?.content);
-      formData.append("categoryId", payload?.category);
-      formData.append("file", payload?.image);
+      formData.append("category", payload?.category);  // ✅ Fixed: Changed from 'categoryId' to 'category'
+      formData.append("image", payload?.image);        // ✅ Fixed: Changed from 'file' to 'image'
 
       const token = getState().users?.userAuth?.userInfo?.token;
       const config = {
@@ -197,8 +198,8 @@ export const updatePostAction = createAsyncThunk(
       const formData = new FormData();
       formData.append("title", payload?.title);
       formData.append("content", payload?.content);
-      formData.append("categoryId", payload?.category);
-      formData.append("file", payload?.image);
+      formData.append("category", payload?.category);  // ✅ Fixed: Changed from 'categoryId' to 'category'
+      formData.append("image", payload?.image);        // ✅ Fixed: Changed from 'file' to 'image'
 
       const token = getState().users?.userAuth?.userInfo?.token;
       const config = {
@@ -217,7 +218,6 @@ export const updatePostAction = createAsyncThunk(
     }
   }
 );
-
 //!clap post
 export const clapPostAction = createAsyncThunk(
   "posts/clap",

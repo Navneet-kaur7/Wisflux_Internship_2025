@@ -236,3 +236,248 @@ exports.deletePost = asyncHandler(async (req, res) => {
     });
   }
 });
+
+// Add these missing functions to your posts.js controller file
+
+//@desc  Get public posts (limited)
+//@route GET /api/v1/posts/public
+//@access Public
+exports.getPublicPosts = asyncHandler(async (req, res) => {
+  try {
+    const posts = await Post.find({})
+      .populate("author", "username email")
+      .populate("category", "name")
+      .sort({ createdAt: -1 })
+      .limit(4); // Limit to 4 posts for public view
+
+    res.status(200).json({
+      status: "success",
+      message: "Public posts fetched successfully",
+      posts,
+    });
+  } catch (error) {
+    console.error("Get public posts error:", error);
+    res.status(500).json({
+      status: "error",
+      message: error.message || "Failed to fetch public posts"
+    });
+  }
+});
+
+//@desc  Like a post
+//@route PUT /api/v1/posts/likes/:id
+//@access Private
+exports.likePost = asyncHandler(async (req, res) => {
+  try {
+    const postId = req.params.id;
+    const userId = req.userAuth._id;
+
+    const post = await Post.findById(postId);
+    if (!post) {
+      return res.status(404).json({
+        status: "error",
+        message: "Post not found"
+      });
+    }
+
+    // Check if user already liked the post
+    const isLiked = post.likes.includes(userId);
+    
+    if (isLiked) {
+      // Remove like
+      post.likes = post.likes.filter(id => id.toString() !== userId.toString());
+    } else {
+      // Add like and remove dislike if exists
+      post.likes.push(userId);
+      post.dislikes = post.dislikes.filter(id => id.toString() !== userId.toString());
+    }
+
+    await post.save();
+
+    const updatedPost = await Post.findById(postId)
+      .populate("author", "username email")
+      .populate("category", "name");
+
+    res.status(200).json({
+      status: "success",
+      message: isLiked ? "Post unliked successfully" : "Post liked successfully",
+      post: updatedPost,
+    });
+  } catch (error) {
+    console.error("Like post error:", error);
+    res.status(500).json({
+      status: "error",
+      message: error.message || "Failed to like post"
+    });
+  }
+});
+
+//@desc  Dislike a post
+//@route PUT /api/v1/posts/dislikes/:id
+//@access Private
+exports.disLikePost = asyncHandler(async (req, res) => {
+  try {
+    const postId = req.params.id;
+    const userId = req.userAuth._id;
+
+    const post = await Post.findById(postId);
+    if (!post) {
+      return res.status(404).json({
+        status: "error",
+        message: "Post not found"
+      });
+    }
+
+    // Check if user already disliked the post
+    const isDisliked = post.dislikes.includes(userId);
+    
+    if (isDisliked) {
+      // Remove dislike
+      post.dislikes = post.dislikes.filter(id => id.toString() !== userId.toString());
+    } else {
+      // Add dislike and remove like if exists
+      post.dislikes.push(userId);
+      post.likes = post.likes.filter(id => id.toString() !== userId.toString());
+    }
+
+    await post.save();
+
+    const updatedPost = await Post.findById(postId)
+      .populate("author", "username email")
+      .populate("category", "name");
+
+    res.status(200).json({
+      status: "success",
+      message: isDisliked ? "Post undisliked successfully" : "Post disliked successfully",
+      post: updatedPost,
+    });
+  } catch (error) {
+    console.error("Dislike post error:", error);
+    res.status(500).json({
+      status: "error",
+      message: error.message || "Failed to dislike post"
+    });
+  }
+});
+
+//@desc  Clap a post
+//@route PUT /api/v1/posts/claps/:id
+//@access Private
+exports.claps = asyncHandler(async (req, res) => {
+  try {
+    const postId = req.params.id;
+
+    const post = await Post.findById(postId);
+    if (!post) {
+      return res.status(404).json({
+        status: "error",
+        message: "Post not found"
+      });
+    }
+
+    // Increment claps
+    post.claps += 1;
+    await post.save();
+
+    const updatedPost = await Post.findById(postId)
+      .populate("author", "username email")
+      .populate("category", "name");
+
+    res.status(200).json({
+      status: "success",
+      message: "Post clapped successfully",
+      post: updatedPost,
+    });
+  } catch (error) {
+    console.error("Clap post error:", error);
+    res.status(500).json({
+      status: "error",
+      message: error.message || "Failed to clap post"
+    });
+  }
+});
+
+//@desc  Schedule a post
+//@route PUT /api/v1/posts/schedule/:postId
+//@access Private
+exports.schedule = asyncHandler(async (req, res) => {
+  try {
+    const { postId } = req.params;
+    const { scheduledPublish } = req.body;
+
+    const post = await Post.findById(postId);
+    if (!post) {
+      return res.status(404).json({
+        status: "error",
+        message: "Post not found"
+      });
+    }
+
+    // Check if user owns the post
+    if (post.author.toString() !== req.userAuth._id.toString()) {
+      return res.status(403).json({
+        status: "error",
+        message: "Not authorized to schedule this post"
+      });
+    }
+
+    post.shedduledPublished = new Date(scheduledPublish);
+    await post.save();
+
+    const updatedPost = await Post.findById(postId)
+      .populate("author", "username email")
+      .populate("category", "name");
+
+    res.status(200).json({
+      status: "success",
+      message: "Post scheduled successfully",
+      post: updatedPost,
+    });
+  } catch (error) {
+    console.error("Schedule post error:", error);
+    res.status(500).json({
+      status: "error",
+      message: error.message || "Failed to schedule post"
+    });
+  }
+});
+
+//@desc  Track post view count
+//@route PUT /api/v1/posts/:id/post-view-count
+//@access Private
+exports.postViewCount = asyncHandler(async (req, res) => {
+  try {
+    const postId = req.params.id;
+    const userId = req.userAuth._id;
+
+    const post = await Post.findById(postId);
+    if (!post) {
+      return res.status(404).json({
+        status: "error",
+        message: "Post not found"
+      });
+    }
+
+    // Check if user hasn't viewed this post before
+    if (!post.postViews.includes(userId)) {
+      post.postViews.push(userId);
+      await post.save();
+    }
+
+    const updatedPost = await Post.findById(postId)
+      .populate("author", "username email")
+      .populate("category", "name");
+
+    res.status(200).json({
+      status: "success",
+      message: "Post view recorded successfully",
+      post: updatedPost,
+    });
+  } catch (error) {
+    console.error("Post view count error:", error);
+    res.status(500).json({
+      status: "error",
+      message: error.message || "Failed to record post view"
+    });
+  }
+});

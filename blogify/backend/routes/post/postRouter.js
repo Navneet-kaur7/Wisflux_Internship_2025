@@ -23,26 +23,38 @@ const postsRouter = express.Router();
 const upload = multer({ storage });
 
 //create
-postsRouter.post("/", isLoggin, upload.single("file"), createPost);
-//getting all
-postsRouter.get("/", isLoggin, getPosts);
-//get only 4 posts
-postsRouter.get("/public", getPublicPosts);
-//like post
-postsRouter.put("/likes/:id", isLoggin, likePost);
-//schedule post
-postsRouter.put("/schedule/:postId", isLoggin, schedule);
-//dislike post
-postsRouter.put("/dislikes/:id", isLoggin, disLikePost);
-//clap a post
-postsRouter.put("/claps/:id", isLoggin, claps);
-//update
-postsRouter.put("/:id/post-view-count", isLoggin, postViewCount);
-//single
-postsRouter.get("/:id", getPost);
-//update
-postsRouter.put("/:id", isLoggin, upload.single("file"), updatePost);
+postsRouter.post("/", isLoggin, upload.single("image"), createPost);
 
-//delete
+//getting all posts (private)
+postsRouter.get("/", isLoggin, getPosts);
+
+// ✅ IMPORTANT: Put specific routes BEFORE parameterized routes
+//get only 4 posts (public) - This must come before /:id route
+postsRouter.get("/public", getPublicPosts);
+
+//like post - specific route, comes before /:id
+postsRouter.put("/likes/:id", isLoggin, likePost);
+
+//schedule post - specific route, comes before /:id
+postsRouter.put("/schedule/:postId", isLoggin, schedule);
+
+//dislike post - specific route, comes before /:id
+postsRouter.put("/dislikes/:id", isLoggin, disLikePost);
+
+//clap a post - specific route, comes before /:id
+postsRouter.put("/claps/:id", isLoggin, claps);
+
+//update post view count - specific route, comes before /:id
+postsRouter.put("/:id/post-view-count", isLoggin, postViewCount);
+
+// ✅ Parameterized routes should come AFTER all specific routes
+//get single post - this should come after all specific routes
+postsRouter.get("/:id", getPost);
+
+//update post - parameterized route
+postsRouter.put("/:id", isLoggin, upload.single("image"), updatePost);
+
+//delete post - parameterized route
 postsRouter.delete("/:id", isLoggin, deletePost);
+
 module.exports = postsRouter;
