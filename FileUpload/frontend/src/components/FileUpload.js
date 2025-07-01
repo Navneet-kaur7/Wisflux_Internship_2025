@@ -48,16 +48,14 @@ const FileUpload = ({ onFileUpload }) => {
         },
       });
 
-      setMessage('Files uploaded successfully!');
+      setMessage('Upload successful!');
       
-      // Call parent callback with uploaded files
       const uploadedFiles = uploadType === 'single' 
         ? [response.data.file] 
         : response.data.files;
       
       onFileUpload(uploadedFiles);
       
-      // Reset form
       setSelectedFiles(null);
       document.getElementById('fileInput').value = '';
       
@@ -70,11 +68,11 @@ const FileUpload = ({ onFileUpload }) => {
   };
 
   const formatFileSize = (bytes) => {
-    if (bytes === 0) return '0 Bytes';
+    if (bytes === 0) return '0 B';
     const k = 1024;
-    const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+    const sizes = ['B', 'KB', 'MB', 'GB'];
     const i = Math.floor(Math.log(bytes) / Math.log(k));
-    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+    return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i];
   };
 
   return (
@@ -89,7 +87,7 @@ const FileUpload = ({ onFileUpload }) => {
             checked={uploadType === 'single'}
             onChange={(e) => setUploadType(e.target.value)}
           />
-          Single File
+          <span>Single File</span>
         </label>
         <label>
           <input
@@ -98,7 +96,7 @@ const FileUpload = ({ onFileUpload }) => {
             checked={uploadType === 'multiple'}
             onChange={(e) => setUploadType(e.target.value)}
           />
-          Multiple Files
+          <span>Multiple Files</span>
         </label>
       </div>
 
@@ -120,7 +118,7 @@ const FileUpload = ({ onFileUpload }) => {
             {Array.from(selectedFiles).map((file, index) => (
               <li key={index}>
                 <span className="file-name">{file.name}</span>
-                <span className="file-size">({formatFileSize(file.size)})</span>
+                <span className="file-size">{formatFileSize(file.size)}</span>
               </li>
             ))}
           </ul>
@@ -148,7 +146,7 @@ const FileUpload = ({ onFileUpload }) => {
       )}
 
       {message && (
-        <div className={`message ${message.includes('success') ? 'success' : 'error'}`}>
+        <div className={`message ${message.includes('successful') ? 'success' : 'error'}`}>
           {message}
         </div>
       )}
