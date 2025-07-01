@@ -6,7 +6,7 @@ const Category = require("../../model/Category/Category");
 //@access Private
 
 exports.createCategory = asyncHandler(async (req, res) => {
-  const { name, author } = req.body;
+  const { name } = req.body;
   //! if exist
   const categoryFound = await Category.findOne({ name });
   if (categoryFound) {
@@ -32,9 +32,9 @@ exports.getCategories = asyncHandler(async (req, res) => {
     path: "posts",
     model: "Post",
   });
-  res.status(201).json({
+  res.status(200).json({
     status: "success",
-    message: "Categoryies successfully fetched",
+    message: "Categories successfully fetched",
     categories,
   });
 });
@@ -45,9 +45,9 @@ exports.getCategories = asyncHandler(async (req, res) => {
 
 exports.deleteCategory = asyncHandler(async (req, res) => {
   await Category.findByIdAndDelete(req.params.id);
-  res.status(201).json({
+  res.status(200).json({
     status: "success",
-    message: "Categoryies successfully deleted",
+    message: "Category successfully deleted",
   });
 });
 
@@ -66,9 +66,9 @@ exports.updateCategory = asyncHandler(async (req, res) => {
       runValidators: true,
     }
   );
-  res.status(201).json({
+  res.status(200).json({
     status: "success",
-    message: "Categoryies successfully deleted",
+    message: "Category successfully updated",
     category,
   });
 });

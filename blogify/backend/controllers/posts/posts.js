@@ -1,383 +1,238 @@
 const asyncHandler = require("express-async-handler");
-const Category = require("../../model/Category/Category");
 const Post = require("../../model/Post/Post");
-const User = require("../../model/User/User");
-const expressAsyncHandler = require("express-async-handler");
+const Category = require("../../model/Category/Category");
+const multer = require("multer");
+const storage = require("../../utils/fileUpload");
+
+// Multer config
+const upload = multer({ storage });
+
 //@desc  Create a post
 //@route POST /api/v1/posts
 //@access Private
 
-exports.createPost = asyncHandler(async (req, res) => {
-  //! Find the user/chec if user account is verified
-  const userFound = await User.findById(req.userAuth._id);
-  if (!userFound) {
-    throw new Error("User Not found");
-  }
-  // if (!userFound?.isVerified) {
-  //   throw new Error("Action denied, your account is not verified");
-  // }
-  //Get the payload
-  const { title, content, categoryId } = req.body;
-  //chech if post exists
-  const postFound = await Post.findOne({ title });
-  if (postFound) {
-    throw new Error("Post aleady exists");
-  }
-  //Create post
-  const post = await Post.create({
-    title,
-    content,
-    category: categoryId,
-    author: req?.userAuth?._id,
-    image: req?.file?.path,
-  });
-  //!Associate post to user
-  await User.findByIdAndUpdate(
-    req?.userAuth?._id,
-    {
-      $push: { posts: post._id },
-    },
-    {
-      new: true,
-    }
-  );
+exports.createPost = [
+  upload.single("image"),
+  asyncHandler(async (req, res) => {
+    console.log("Request body:", req.body);
+    console.log("Request file:", req.file);
+    console.log("User auth:", req.userAuth);
 
-  //* Push post into category
-  await Category.findByIdAndUpdate(
-    req?.userAuth?._id,
-    {
-      $push: { posts: post._id },
-    },
-    {
-      new: true,
+    const { title, content, category } = req.body;
+
+    // Validation
+    if (!title || !content || !category) {
+      return res.status(400).json({
+        status: "error",
+        message: "Title, content, and category are required"
+      });
     }
-  );
-  //? send the response
-  res.json({
-    status: "scuccess",
-    message: "Post Succesfully created",
-    post,
-  });
-});
+
+    // Check if user is authenticated
+    if (!req.userAuth?._id) {
+      return res.status(401).json({
+        status: "error",
+        message: "User not authenticated"
+      });
+    }
+
+    try {
+      // Check if category exists
+      const categoryExists = await Category.findById(category);
+      if (!categoryExists) {
+        return res.status(400).json({
+          status: "error",
+          message: "Category does not exist"
+        });
+      }
+
+      // Create post
+      const postData = {
+        title,
+        content,
+        category,
+        author: req.userAuth._id,
+      };
+
+      // Add image if uploaded
+      if (req.file) {
+        postData.image = req.file.path;
+      }
+
+      const post = await Post.create(postData);
+
+      // Update category to include this post
+      await Category.findByIdAndUpdate(category, {
+        $push: { posts: post._id }
+      });
+
+      // Populate the post with author and category details
+      const populatedPost = await Post.findById(post._id)
+        .populate("author", "username email")
+        .populate("category", "name");
+
+      res.status(201).json({
+        status: "success",
+        message: "Post created successfully",
+        post: populatedPost,
+      });
+    } catch (error) {
+      console.error("Post creation error:", error);
+      res.status(500).json({
+        status: "error",
+        message: error.message || "Failed to create post"
+      });
+    }
+  })
+];
 
 //@desc  Get all posts
 //@route GET /api/v1/posts
-//@access Private
+//@access Public
 
 exports.getPosts = asyncHandler(async (req, res) => {
-  // !find all users who have blocked the logged-in user
-  const loggedInUserId = req.userAuth?._id;
-  //get current time
-  const currentTime = new Date();
-  const usersBlockingLoggedInuser = await User.find({
-    blockedUsers: loggedInUserId,
-  });
-  // Extract the IDs of users who have blocked the logged-in user
-  const blockingUsersIds = usersBlockingLoggedInuser?.map((user) => user?._id);
-  //! Get the category, searchterm from request
-  const category = req.query.category;
-  const searchTerm = req.query.searchTerm;
-  //query
-  let query = {
-    author: { $nin: blockingUsersIds },
-    $or: [
-      {
-        shedduledPublished: { $lte: currentTime },
-        shedduledPublished: null,
-      },
-    ],
-  };
-  //! check if category/searchterm is specified, then add to the query
-  if (category) {
-    query.category = category;
-  }
-  if (searchTerm) {
-    query.title = { $regex: searchTerm, $options: "i" };
-  }
-  //Pagination parameters from request
+  try {
+    const posts = await Post.find({})
+      .populate("author", "username email")
+      .populate("category", "name")
+      .sort({ createdAt: -1 });
 
-  const page = parseInt(req.query.page, 10) || 1;
-  const limit = parseInt(req.query.limit, 10) || 5;
-  const startIndex = (page - 1) * limit;
-  const endIndex = page * limit;
-  const total = await Post.countDocuments(query);
-
-  const posts = await Post.find(query)
-    .populate({
-      path: "author",
-      model: "User",
-      select: "email role username",
-    })
-    .populate("category")
-    .skip(startIndex)
-    .limit(limit)
-    .sort({ createdAt: -1 });
-  // Pagination result
-  const pagination = {};
-  if (endIndex < total) {
-    pagination.next = {
-      page: page + 1,
-      limit,
-    };
+    res.status(200).json({
+      status: "success",
+      message: "Posts fetched successfully",
+      posts,
+    });
+  } catch (error) {
+    console.error("Get posts error:", error);
+    res.status(500).json({
+      status: "error",
+      message: error.message || "Failed to fetch posts"
+    });
   }
-
-  if (startIndex > 0) {
-    pagination.prev = {
-      page: page - 1,
-      limit,
-    };
-  }
-
-  res.status(201).json({
-    status: "success",
-    message: "Posts successfully fetched",
-    pagination,
-    posts,
-  });
 });
 
 //@desc  Get single post
 //@route GET /api/v1/posts/:id
-//@access PUBLIC
-exports.getPost = asyncHandler(async (req, res) => {
-  const post = await Post.findById(req.params.id)
-    .populate("author")
-    .populate("category")
-    .populate({
-      path: "comments",
-      model: "Comment",
-      populate: {
-        path: "author",
-        select: "username",
-      },
-    });
+//@access Public
 
-  res.status(201).json({
-    status: "success",
-    message: "Post successfully fetched",
-    post,
-  });
+exports.getPost = asyncHandler(async (req, res) => {
+  try {
+    const post = await Post.findById(req.params.id)
+      .populate("author", "username email")
+      .populate("category", "name");
+
+    if (!post) {
+      return res.status(404).json({
+        status: "error",
+        message: "Post not found"
+      });
+    }
+
+    res.status(200).json({
+      status: "success",
+      message: "Post fetched successfully",
+      post,
+    });
+  } catch (error) {
+    console.error("Get post error:", error);
+    res.status(500).json({
+      status: "error",
+      message: error.message || "Failed to fetch post"
+    });
+  }
 });
 
-//@desc  Delete Post
+//@desc  Update post
+//@route PUT /api/v1/posts/:id
+//@access Private
+
+exports.updatePost = [
+  upload.single("image"),
+  asyncHandler(async (req, res) => {
+    try {
+      const { title, content, category } = req.body;
+      
+      const post = await Post.findById(req.params.id);
+      if (!post) {
+        return res.status(404).json({
+          status: "error",
+          message: "Post not found"
+        });
+      }
+
+      // Check if user owns the post
+      if (post.author.toString() !== req.userAuth._id.toString()) {
+        return res.status(403).json({
+          status: "error",
+          message: "Not authorized to update this post"
+        });
+      }
+
+      const updateData = {};
+      if (title) updateData.title = title;
+      if (content) updateData.content = content;
+      if (category) updateData.category = category;
+      if (req.file) updateData.image = req.file.path;
+
+      const updatedPost = await Post.findByIdAndUpdate(
+        req.params.id,
+        updateData,
+        { new: true, runValidators: true }
+      ).populate("author", "username email").populate("category", "name");
+
+      res.status(200).json({
+        status: "success",
+        message: "Post updated successfully",
+        post: updatedPost,
+      });
+    } catch (error) {
+      console.error("Update post error:", error);
+      res.status(500).json({
+        status: "error",
+        message: error.message || "Failed to update post"
+      });
+    }
+  })
+];
+
+//@desc  Delete post
 //@route DELETE /api/v1/posts/:id
 //@access Private
 
 exports.deletePost = asyncHandler(async (req, res) => {
-  //! Find the post
-  const postFound = await Post.findById(req.params.id);
-  const isAuthor =
-    req.userAuth?._id?.toString() === postFound?.author?._id?.toString();
-  console.log(isAuthor);
-
-  if (!isAuthor) {
-    throw new Error("Action denied, you are not the creator of this post");
-  }
-  await Post.findByIdAndDelete(req.params.id);
-  res.status(201).json({
-    status: "success",
-    message: "Post successfully deleted",
-  });
-});
-
-//@desc  update Post
-//@route PUT /api/v1/posts/:id
-//@access Private
-
-exports.updatePost = asyncHandler(async (req, res) => {
-  //!Check if the post exists
-  const { id } = req.params;
-  const postFound = await Post.findById(id);
-  if (!postFound) {
-    throw new Error("Post not found");
-  }
-  //! image update
-  const { title, category, content } = req.body;
-  const post = await Post.findByIdAndUpdate(
-    id,
-    {
-      image: req?.file?.path ? req?.file?.path : postFound?.image,
-      title: title ? title : postFound?.title,
-      category: category ? category : postFound?.category,
-      content: content ? content : postFound?.content,
-    },
-    {
-      new: true,
-      runValidators: true,
+  try {
+    const post = await Post.findById(req.params.id);
+    if (!post) {
+      return res.status(404).json({
+        status: "error",
+        message: "Post not found"
+      });
     }
-  );
-  res.status(201).json({
-    status: "success",
-    message: "post successfully updated",
-    post,
-  });
-});
 
-//@desc  Get only 4 posts
-//@route GET /api/v1/posts
-//@access PUBLIC
-
-exports.getPublicPosts = asyncHandler(async (req, res) => {
-  const posts = await Post.find({})
-    .sort({ createdAt: -1 })
-    .limit(4)
-    .populate("category");
-  res.status(201).json({
-    status: "success",
-    message: "Posts successfully fetched",
-    posts,
-  });
-});
-
-//@desc   liking a Post
-//@route  PUT /api/v1/posts/likes/:id
-//@access Private
-
-exports.likePost = expressAsyncHandler(async (req, res) => {
-  //Get the id of the post
-  const { id } = req.params;
-  //get the login user
-  const userId = req.userAuth._id;
-  //Find the post
-  const post = await Post.findById(id);
-  if (!post) {
-    throw new Error("Post not found");
-  }
-  //Push thr user into post likes
-
-  await Post.findByIdAndUpdate(
-    id,
-    {
-      $addToSet: { likes: userId },
-    },
-    { new: true }
-  );
-  // Remove the user from the dislikes array if present
-  post.dislikes = post.dislikes.filter(
-    (dislike) => dislike.toString() !== userId.toString()
-  );
-  //resave the post
-  await post.save();
-  res.status(200).json({ message: "Post liked successfully.", post });
-});
-
-//@desc   liking a Post
-//@route  PUT /api/v1/posts/likes/:id
-//@access Private
-
-exports.disLikePost = expressAsyncHandler(async (req, res) => {
-  //Get the id of the post
-  const { id } = req.params;
-  //get the login user
-  const userId = req.userAuth._id;
-  //Find the post
-  const post = await Post.findById(id);
-  if (!post) {
-    throw new Error("Post not found");
-  }
-  //Push the user into post dislikes
-
-  await Post.findByIdAndUpdate(
-    id,
-    {
-      $addToSet: { dislikes: userId },
-    },
-    { new: true }
-  );
-  // Remove the user from the likes array if present
-  post.likes = post.likes.filter(
-    (like) => like.toString() !== userId.toString()
-  );
-  //resave the post
-  await post.save();
-  res.status(200).json({ message: "Post disliked successfully.", post });
-});
-
-//@desc   clapong a Post
-//@route  PUT /api/v1/posts/claps/:id
-//@access Private
-
-exports.claps = expressAsyncHandler(async (req, res) => {
-  //Get the id of the post
-  const { id } = req.params;
-  //Find the post
-  const post = await Post.findById(id);
-  if (!post) {
-    throw new Error("Post not found");
-  }
-  //implement the claps
-  const updatedPost = await Post.findByIdAndUpdate(
-    id,
-    {
-      $inc: { claps: 1 },
-    },
-    {
-      new: true,
+    // Check if user owns the post
+    if (post.author.toString() !== req.userAuth._id.toString()) {
+      return res.status(403).json({
+        status: "error",
+        message: "Not authorized to delete this post"
+      });
     }
-  );
-  res.status(200).json({ message: "Post clapped successfully.", updatedPost });
-});
 
-//@desc   Shedule a post
-//@route  PUT /api/v1/posts/schedule/:postId
-//@access Private
+    await Post.findByIdAndDelete(req.params.id);
 
-exports.schedule = expressAsyncHandler(async (req, res) => {
-  //get the payload
-  const { scheduledPublish } = req.body;
-  const { postId } = req.params;
-  //check if postid and scheduledpublished found
-  if (!postId || !scheduledPublish) {
-    throw new Error("PostID and schedule date are required");
-  }
-  //Find the post
-  const post = await Post.findById(postId);
-  if (!post) {
-    throw new Error("Post not found...");
-  }
-  //check if tjhe user is the author of the post
-  if (post.author.toString() !== req.userAuth._id.toString()) {
-    throw new Error("You can schedulle your own post ");
-  }
-  // Check if the scheduledPublish date is in the past
-  const scheduleDate = new Date(scheduledPublish);
-  const currentDate = new Date();
-  if (scheduleDate < currentDate) {
-    throw new Error("The scheduled publish date cannot be in the past.");
-  }
-  //update the post
-  post.shedduledPublished = scheduledPublish;
-  await post.save();
-  res.json({
-    status: "success",
-    message: "Post scheduled successfully",
-    post,
-  });
-});
+    // Remove post from category
+    await Category.findByIdAndUpdate(post.category, {
+      $pull: { posts: post._id }
+    });
 
-//@desc   post  view counta
-//@route  PUT /api/v1/posts/:id/post-views-count
-//@access Private
-
-exports.postViewCount = expressAsyncHandler(async (req, res) => {
-  //Get the id of the post
-  const { id } = req.params;
-  //get the login user
-  const userId = req.userAuth._id;
-  //Find the post
-  const post = await Post.findById(id);
-  if (!post) {
-    throw new Error("Post not found");
+    res.status(200).json({
+      status: "success",
+      message: "Post deleted successfully",
+    });
+  } catch (error) {
+    console.error("Delete post error:", error);
+    res.status(500).json({
+      status: "error",
+      message: error.message || "Failed to delete post"
+    });
   }
-  //Push thr user into post likes
-
-  await Post.findByIdAndUpdate(
-    id,
-    {
-      $addToSet: { postViews: userId },
-    },
-    { new: true }
-  ).populate("author");
-  await post.save();
-  res.status(200).json({ message: "Post liked successfully.", post });
 });

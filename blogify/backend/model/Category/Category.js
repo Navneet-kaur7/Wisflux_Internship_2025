@@ -18,10 +18,11 @@ const categorySchema = new mongoose.Schema(
       default: 0,
     },
 
-    posts: {
+    // Fixed: This should be an array of ObjectIds to reference multiple posts
+    posts: [{
       type: mongoose.Schema.Types.ObjectId,
       ref: "Post",
-    },
+    }],
   },
   {
     timestamps: true,
@@ -34,8 +35,7 @@ const categorySchema = new mongoose.Schema(
   }
 );
 
-//compile schema to  model
-
+//compile schema to model
 const Category = mongoose.model("Category", categorySchema);
 
 module.exports = Category;
