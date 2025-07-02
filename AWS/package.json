@@ -1,0 +1,28 @@
+{
+  "name": "file-sharing-platform",
+  "version": "1.0.0",
+  "description": "A file sharing platform using AWS S3 with pre-signed URLs",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "nodemon server.js"
+  },
+  "dependencies": {
+    "aws-sdk": "^2.1692.0",
+    "cors": "^2.8.5",
+    "dotenv": "^16.6.1",
+    "express": "^4.21.2"
+  },
+  "devDependencies": {
+    "nodemon": "^3.0.1"
+  },
+  "keywords": [
+    "aws",
+    "s3",
+    "file-upload",
+    "presigned-urls",
+    "file-sharing"
+  ],
+  "author": "Your Name",
+  "license": "MIT"
+}

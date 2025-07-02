@@ -1,0 +1,29 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>S3 File Sharing Platform</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="container">
+        <h1>S3 File Sharing Platform</h1>
+        
+        <div class="upload-section">
+            <h2>Upload File</h2>
+            <input type="file" id="fileInput" multiple>
+            <button onclick="uploadFile()">Upload</button>
+            <div id="uploadProgress"></div>
+        </div>
+        
+        <div class="files-section">
+            <h2>Files</h2>
+            <button onclick="loadFiles()">Refresh</button>
+            <div id="filesList"></div>
+        </div>
+    </div>
+    
+    <script src="script.js"></script>
+</body>
+</html>
