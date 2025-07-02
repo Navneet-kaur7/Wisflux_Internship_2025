@@ -5,6 +5,9 @@ node_modules
 /node_modules
 /.pnp
 .pnp.js
+# Ignore environment files
+*.env
+# Ignore AWS credentials
 .env
 
 # testing
